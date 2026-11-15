@@ -218,6 +218,26 @@ async def on_startup(app):
     except Exception:
         logging.exception("could not list Gemini models")
 
+    # Diagnostics: does the key work at all, and does Google Search grounding work?
+    from google.genai import types as gt
+    from research import generate
+
+    try:
+        await generate(contents="Reply with the single word OK")
+        logging.info("DIAG plain generate: OK")
+    except Exception as e:
+        logging.info("DIAG plain generate FAILED: %s", str(e)[:150])
+    try:
+        await generate(
+            contents="Use Google Search: who won the most recent Premier League match?",
+            config=gt.GenerateContentConfig(
+                tools=[gt.Tool(google_search=gt.GoogleSearch())]
+            ),
+        )
+        logging.info("DIAG search grounding: OK")
+    except Exception as e:
+        logging.info("DIAG search grounding FAILED: %s", str(e)[:150])
+
 
 def main():
     app = Application.builder().token(config.TELEGRAM_TOKEN).post_init(on_startup).build()
