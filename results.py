@@ -1,18 +1,22 @@
-"""Settle pending picks: Gemini + Google Search finds final scores, code decides won/lost."""
+"""Settle pending picks. With ODDS_API_KEY the final scores come from The Odds API
+(only leagues that have waiting picks are queried, to save credits); otherwise Gemini +
+Google Search finds them."""
 import logging
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from google.genai import types
 from pydantic import BaseModel
 
 import config
 import db
+import odds
 from research import generate
 
 # A match is checked once kickoff was this long ago (90 min + half-time + stoppage + buffer).
 FINISHED_AFTER = timedelta(hours=3)
-# Give up on a pick if no score is found this long after kickoff.
-GIVE_UP_AFTER = timedelta(days=4)
+# Give up on a pick if no score is found this long after kickoff (Odds API scores go back 3 days).
+GIVE_UP_AFTER = timedelta(days=3)
 
 
 class Score(BaseModel):
@@ -22,7 +26,33 @@ class Score(BaseModel):
     away_goals: int | None = None
 
 
-async def _find_scores(rows):
+async def _scores_oddsapi(rows) -> dict:
+    """Returns {(home, away): (home_goals, away_goals)} for completed matches."""
+    leagues = {r["league"] for r in rows}
+    keys = [k for k, name in odds.LEAGUES.items() if name in leagues]
+    out = {}
+    async with httpx.AsyncClient(timeout=20) as c:
+        for k in keys:
+            r = await c.get(
+                f"{odds.BASE}/sports/{k}/scores/",
+                params={"apiKey": config.ODDS_API_KEY, "daysFrom": 3, "dateFormat": "iso"},
+            )
+            r.raise_for_status()
+            logging.info("Odds API credits remaining: %s", r.headers.get("x-requests-remaining"))
+            for ev in r.json():
+                if not ev.get("completed") or not ev.get("scores"):
+                    continue
+                try:
+                    sc = {s["name"]: int(s["score"]) for s in ev["scores"]}
+                    out[(ev["home_team"], ev["away_team"])] = (
+                        sc[ev["home_team"]], sc[ev["away_team"]]
+                    )
+                except (KeyError, ValueError, TypeError):
+                    continue
+    return out
+
+
+async def _scores_search(rows) -> dict:
     listing = "\n".join(
         f"{i}. {r['home']} vs {r['away']} (kickoff {r['kickoff_utc']} UTC)"
         for i, r in enumerate(rows)
@@ -39,7 +69,7 @@ async def _find_scores(rows):
         ),
     )
     if not notes.text:
-        return []
+        return {}
     structured = await generate(
         contents=f"Matches:\n{listing}\n\nResearch notes:\n{notes.text}",
         config=types.GenerateContentConfig(
@@ -53,7 +83,13 @@ async def _find_scores(rows):
             temperature=0.0,
         ),
     )
-    return structured.parsed or []
+    out = {}
+    for sc in structured.parsed or []:
+        if 0 <= sc.idx < len(rows) and sc.finished and sc.home_goals is not None \
+                and sc.away_goals is not None:
+            r = rows[sc.idx]
+            out[(r["home"], r["away"])] = (sc.home_goals, sc.away_goals)
+    return out
 
 
 async def settle_pending() -> int:
@@ -63,22 +99,14 @@ async def settle_pending() -> int:
     rows = db.matches_to_settle(cutoff)
     settled = 0
     if rows:
-        for sc in await _find_scores(rows):
-            if not (0 <= sc.idx < len(rows)) or not sc.finished:
+        found = await (_scores_oddsapi(rows) if config.ODDS_API_KEY else _scores_search(rows))
+        for r in rows:
+            goals = found.get((r["home"], r["away"]))
+            if not goals:
                 continue
-            if sc.home_goals is None or sc.away_goals is None:
-                continue
-            r = rows[sc.idx]
-            if sc.home_goals > sc.away_goals:
-                outcome = "home"
-            elif sc.home_goals < sc.away_goals:
-                outcome = "away"
-            else:
-                outcome = "draw"
-            db.settle_match(
-                r["home"], r["away"], r["kickoff_utc"], outcome,
-                f"{sc.home_goals}-{sc.away_goals}",
-            )
+            hg, ag = goals
+            outcome = "home" if hg > ag else "away" if hg < ag else "draw"
+            db.settle_match(r["home"], r["away"], r["kickoff_utc"], outcome, f"{hg}-{ag}")
             settled += 1
     db.void_stale((now - GIVE_UP_AFTER).isoformat(timespec="seconds"))
     logging.info("settlement run: %s matches settled, %s checked", settled, len(rows))

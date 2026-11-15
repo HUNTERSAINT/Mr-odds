@@ -60,7 +60,7 @@ def save_slip(user_id: int, chat_id: int, target: float, total: float, legs) -> 
 def matches_to_settle(older_than_iso: str, limit: int = 20):
     """Distinct matches with pending picks whose kickoff is old enough to be finished."""
     return _db.execute(
-        "SELECT DISTINCT home, away, kickoff_utc FROM picks "
+        "SELECT DISTINCT home, away, kickoff_utc, league FROM picks "
         "WHERE status='pending' AND kickoff_utc < ? ORDER BY kickoff_utc LIMIT ?",
         (older_than_iso, limit),
     ).fetchall()
