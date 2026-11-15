@@ -15,7 +15,7 @@ TELEGRAM_TOKEN = _req("TELEGRAM_TOKEN")
 GEMINI_API_KEY = _req("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 # Tried in order when a model returns 404 (retired) or 429 (quota exhausted).
-_fallbacks = os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.8-flash-lite,gemini-2.5-flash-lite,gemini-2.0-flash")
+_fallbacks = os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite")
 MODELS = [GEMINI_MODEL] + [m.strip() for m in _fallbacks.split(",") if m.strip() and m.strip() != GEMINI_MODEL]
 CACHE_SECONDS = int(os.getenv("CACHE_MINUTES", "30")) * 60
 TIMEZONE = "Africa/Lagos"
