@@ -13,7 +13,7 @@ def _req(name: str) -> str:
 
 TELEGRAM_TOKEN = _req("TELEGRAM_TOKEN")
 GEMINI_API_KEY = _req("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 CACHE_SECONDS = int(os.getenv("CACHE_MINUTES", "30")) * 60
 TIMEZONE = "Africa/Lagos"
 
