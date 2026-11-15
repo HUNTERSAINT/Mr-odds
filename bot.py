@@ -34,14 +34,22 @@ def _today():
     return datetime.now(LOCAL).date()
 
 
-def _days_keyboard(selected: set):
+def _days_keyboard(selected: set, avail: dict | None = None):
+    """avail = {date: {"games": n, "strong": k}}. Without it, show the next 7 plain days."""
     rows = []
-    for i in range(7):
-        d = _today() + timedelta(days=i)
-        mark = "✅ " if d in selected else ""
-        rows.append(
-            [InlineKeyboardButton(f"{mark}{d:%a %d %b}", callback_data=f"day:{d.isoformat()}")]
-        )
+    if avail:
+        for d, c in sorted(avail.items()):
+            mark = "✅ " if d in selected else ""
+            fire = " 🔥" if c["strong"] >= 3 else ""
+            label = f"{mark}{d:%a %d %b} · {c['games']} games · {c['strong']} strong{fire}"
+            rows.append([InlineKeyboardButton(label, callback_data=f"day:{d.isoformat()}")])
+    else:
+        for i in range(7):
+            d = _today() + timedelta(days=i)
+            mark = "✅ " if d in selected else ""
+            rows.append(
+                [InlineKeyboardButton(f"{mark}{d:%a %d %b}", callback_data=f"day:{d.isoformat()}")]
+            )
     rows.append([InlineKeyboardButton("Done ➡️", callback_data="days_done")])
     return InlineKeyboardMarkup(rows)
 
@@ -53,13 +61,35 @@ def _odds_keyboard():
     )
 
 
+async def _avail(ctx) -> dict:
+    """Days that have games (cached, so this rarely costs Odds API credits)."""
+    if "avail" not in ctx.user_data:
+        try:
+            ctx.user_data["avail"] = await available_days()
+        except Exception:
+            logging.exception("could not load days with games")
+            ctx.user_data["avail"] = {}
+    return ctx.user_data["avail"]
+
+
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data.clear()
     ctx.user_data["days"] = set()
+    avail = await _avail(ctx)
+    if avail:
+        text = (
+            "Days with games (next 7 days). 'Strong' = the market gives the favourite "
+            "60%+ to win, 🔥 = 3 or more strong games.\n\n"
+            "Tap the days you want, then press Done."
+        )
+    else:
+        text = (
+            "No games with listed odds found in the next 7 days (the leagues may be on a "
+            "break). You can still pick days below and I'll check again."
+        )
     await update.message.reply_text(
-        "Pick the days you want games from (tap to select), then press Done.\n"
-        "Commands: /stats for the bot's real results, /history for your last slips.",
-        reply_markup=_days_keyboard(set()),
+        text + "\nCommands: /stats for real results, /history for your slips.",
+        reply_markup=_days_keyboard(set(), avail),
     )
 
 
@@ -69,7 +99,7 @@ async def on_day(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     sel = ctx.user_data.setdefault("days", set())
     d = datetime.fromisoformat(q.data.split(":", 1)[1]).date()
     sel.symmetric_difference_update({d})
-    await q.edit_message_reply_markup(_days_keyboard(sel))
+    await q.edit_message_reply_markup(_days_keyboard(sel, await _avail(ctx)))
 
 
 async def on_days_done(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -115,7 +145,7 @@ async def _run(message, user_id: int, ctx, target: float):
             avail = await available_days()
             if avail:
                 days_txt = "\n".join(
-                    f"• {d:%a %d %b}: {n} games" for d, n in sorted(avail.items())
+                    f"• {d:%a %d %b}: {c['games']} games" for d, c in sorted(avail.items())
                 )
                 await message.reply_text(
                     "No games with listed odds on the days you picked.\n\n"

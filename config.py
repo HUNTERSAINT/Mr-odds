@@ -24,6 +24,8 @@ TIMEZONE = "Africa/Lagos"
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 ODDS_REGIONS = os.getenv("ODDS_REGIONS", "eu")
 MIN_BOOKMAKERS = int(os.getenv("MIN_BOOKMAKERS", "5"))
+# A "strong" match = the market gives the favourite at least this win probability.
+HIGH_PROB = float(os.getenv("HIGH_PROB", "0.60"))
 ODDS_CACHE_SECONDS = int(float(os.getenv("ODDS_CACHE_HOURS", "12")) * 3600)
 
 # On Railway, mount a volume at /data and set DB_PATH=/data/bot.db so history survives deploys.

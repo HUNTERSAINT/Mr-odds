@@ -91,6 +91,12 @@ def _normalise(ev: dict, league: str):
     }
 
 
+def favourite_prob(odds: dict) -> float:
+    """Favourite's win probability from the odds, with the bookmaker margin removed."""
+    imp = [1 / v for v in odds.values()]
+    return max(imp) / sum(imp)
+
+
 async def _all_matches() -> list[dict]:
     """Every upcoming match in the next 7 days (served from the cache when fresh)."""
     now = datetime.now(LOCAL)
@@ -111,8 +117,11 @@ async def get_matches(days: list) -> list[dict]:
 
 
 async def days_with_games() -> dict:
-    """{date: number_of_matches} for the next 7 days."""
+    """{date: {"games": n, "strong": k}} for the next 7 days."""
     counts: dict = {}
     for m in await _all_matches():
-        counts[m["kickoff"].date()] = counts.get(m["kickoff"].date(), 0) + 1
+        c = counts.setdefault(m["kickoff"].date(), {"games": 0, "strong": 0})
+        c["games"] += 1
+        if favourite_prob(m["odds"]) >= config.HIGH_PROB:
+            c["strong"] += 1
     return counts
