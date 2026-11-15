@@ -15,7 +15,7 @@ import config
 import db
 import results
 from research import LOCAL, client
-from source import get_picks
+from source import available_days, get_picks
 from slip import build_slip
 
 logging.basicConfig(level=logging.INFO)
@@ -112,9 +112,20 @@ async def _run(message, user_id: int, ctx, target: float):
     try:
         matches, preds = await get_picks(days)
         if not matches:
-            await message.reply_text(
-                "No games with verifiable odds found for those days. Try other days with /start."
-            )
+            avail = await available_days()
+            if avail:
+                days_txt = "\n".join(
+                    f"• {d:%a %d %b}: {n} games" for d, n in sorted(avail.items())
+                )
+                await message.reply_text(
+                    "No games with listed odds on the days you picked.\n\n"
+                    f"Days that have games:\n{days_txt}\n\nSend /start and pick those days."
+                )
+            else:
+                await message.reply_text(
+                    "No upcoming games found in the next 7 days (the leagues may be on a "
+                    "break). Try again later with /start."
+                )
             return
         result = build_slip(matches, preds, target)
     except Exception as e:
@@ -221,7 +232,7 @@ async def on_startup(app):
 
 
 def main():
-    app = Application.builder().token(config.TELEGRAM_TOKEN).post_init(on_startup).build()
+    app = Application.builder().token(config.TELEGRAM_TOKEN).post_init(on_startup).concurrent_updates(True).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("history", history))

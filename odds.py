@@ -91,15 +91,28 @@ def _normalise(ev: dict, league: str):
     }
 
 
-async def get_matches(days: list) -> list[dict]:
-    wanted = set(days)
+async def _all_matches() -> list[dict]:
+    """Every upcoming match in the next 7 days (served from the cache when fresh)."""
     now = datetime.now(LOCAL)
     out = []
     async with httpx.AsyncClient(timeout=20) as client:
         for key, name in LEAGUES.items():
-            for ev in await _fetch_league(client, key):
-                m = _normalise(ev, name)
-                if m and m["kickoff"].date() in wanted and m["kickoff"] > now:
-                    out.append(m)
+            events = await _fetch_league(client, key)
+            kept = [m for m in (_normalise(ev, name) for ev in events) if m and m["kickoff"] > now]
+            logging.info("%s: %s events, %s usable", name, len(events), len(kept))
+            out.extend(kept)
     out.sort(key=lambda m: m["kickoff"])
     return out
+
+
+async def get_matches(days: list) -> list[dict]:
+    wanted = set(days)
+    return [m for m in await _all_matches() if m["kickoff"].date() in wanted]
+
+
+async def days_with_games() -> dict:
+    """{date: number_of_matches} for the next 7 days."""
+    counts: dict = {}
+    for m in await _all_matches():
+        counts[m["kickoff"].date()] = counts.get(m["kickoff"].date(), 0) + 1
+    return counts

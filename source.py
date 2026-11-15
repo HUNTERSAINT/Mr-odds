@@ -27,3 +27,10 @@ async def get_picks(days: list):
     if preds:
         _cache[key] = (time.time(), result)
     return result
+
+
+async def available_days() -> dict:
+    """Days that have matches (Odds API mode only)."""
+    if not config.ODDS_API_KEY:
+        return {}
+    return await odds.days_with_games()
