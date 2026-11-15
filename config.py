@@ -26,6 +26,8 @@ ODDS_REGIONS = os.getenv("ODDS_REGIONS", "eu")
 MIN_BOOKMAKERS = int(os.getenv("MIN_BOOKMAKERS", "5"))
 # A "strong" match = the market gives the favourite at least this win probability.
 HIGH_PROB = float(os.getenv("HIGH_PROB", "0.60"))
+# How many days ahead the day menu looks (odds usually exist ~1-2 weeks out).
+DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "14"))
 ODDS_CACHE_SECONDS = int(float(os.getenv("ODDS_CACHE_HOURS", "12")) * 3600)
 
 # On Railway, mount a volume at /data and set DB_PATH=/data/bot.db so history survives deploys.

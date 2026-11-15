@@ -44,7 +44,7 @@ def _days_keyboard(selected: set, avail: dict | None = None):
             label = f"{mark}{d:%a %d %b} · {c['games']} games · {c['strong']} strong{fire}"
             rows.append([InlineKeyboardButton(label, callback_data=f"day:{d.isoformat()}")])
     else:
-        for i in range(7):
+        for i in range(config.DAYS_AHEAD):
             d = _today() + timedelta(days=i)
             mark = "✅ " if d in selected else ""
             rows.append(
@@ -78,13 +78,13 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     avail = await _avail(ctx)
     if avail:
         text = (
-            "Days with games (next 7 days). 'Strong' = the market gives the favourite "
+            "Days with games (coming days). 'Strong' = the market gives the favourite "
             "60%+ to win, 🔥 = 3 or more strong games.\n\n"
             "Tap the days you want, then press Done."
         )
     else:
         text = (
-            "No games with listed odds found in the next 7 days (the leagues may be on a "
+            "No games with listed odds found in the coming days (the leagues may be on a "
             "break). You can still pick days below and I'll check again."
         )
     await update.message.reply_text(
@@ -153,7 +153,7 @@ async def _run(message, user_id: int, ctx, target: float):
                 )
             else:
                 await message.reply_text(
-                    "No upcoming games found in the next 7 days (the leagues may be on a "
+                    "No upcoming games found in the coming days (the leagues may be on a "
                     "break). Try again later with /start."
                 )
             return

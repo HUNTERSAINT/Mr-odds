@@ -28,15 +28,15 @@ _FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def _window() -> tuple[str, str]:
-    """Always fetch the next 7 days per league, so one cached fetch serves any day choice."""
+    """Always fetch the whole look-ahead window per league, so one cached fetch serves any day choice."""
     start = datetime.now(timezone.utc)
-    last_day = datetime.now(LOCAL).date() + timedelta(days=7)
+    last_day = datetime.now(LOCAL).date() + timedelta(days=config.DAYS_AHEAD)
     end = datetime.combine(last_day, dtime(23, 59, 59), tzinfo=LOCAL).astimezone(timezone.utc)
     return start.strftime(_FMT), end.strftime(_FMT)
 
 
 async def _fetch_league(client: httpx.AsyncClient, key: str) -> list:
-    cached = db.cache_get(f"odds:{key}", config.ODDS_CACHE_SECONDS)
+    cached = db.cache_get(f"odds:{key}:{config.DAYS_AHEAD}", config.ODDS_CACHE_SECONDS)
     if cached is not None:
         return json.loads(cached)
     start, end = _window()
@@ -58,7 +58,7 @@ async def _fetch_league(client: httpx.AsyncClient, key: str) -> list:
         r.raise_for_status()
         data = r.json()
         logging.info("Odds API credits remaining: %s", r.headers.get("x-requests-remaining"))
-    db.cache_set(f"odds:{key}", json.dumps(data))
+    db.cache_set(f"odds:{key}:{config.DAYS_AHEAD}", json.dumps(data))
     return data
 
 
@@ -98,7 +98,7 @@ def favourite_prob(odds: dict) -> float:
 
 
 async def _all_matches() -> list[dict]:
-    """Every upcoming match in the next 7 days (served from the cache when fresh)."""
+    """Every upcoming match in the look-ahead window (served from the cache when fresh)."""
     now = datetime.now(LOCAL)
     out = []
     async with httpx.AsyncClient(timeout=20) as client:
@@ -117,7 +117,7 @@ async def get_matches(days: list) -> list[dict]:
 
 
 async def days_with_games() -> dict:
-    """{date: {"games": n, "strong": k}} for the next 7 days."""
+    """{date: {"games": n, "strong": k}} for the look-ahead window."""
     counts: dict = {}
     for m in await _all_matches():
         c = counts.setdefault(m["kickoff"].date(), {"games": 0, "strong": 0})
