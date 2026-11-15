@@ -18,6 +18,8 @@ from research import LOCAL, get_picks
 from slip import build_slip
 
 logging.basicConfig(level=logging.INFO)
+# httpx logs full request URLs, which contain the Telegram bot token
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 DISCLAIMER = (
     "\n\nOdds come from web search and can be out of date: confirm them on your "
