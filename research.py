@@ -29,8 +29,8 @@ async def generate(**kwargs):
     for model in config.MODELS:
         try:
             return await client.aio.models.generate_content(model=model, **kwargs)
-        except errors.ClientError as e:
-            if e.code in (404, 429):
+        except errors.APIError as e:
+            if e.code in (404, 429, 500, 503):
                 logging.warning("model %s unavailable (%s), trying next", model, e.code)
                 last = e
                 continue
