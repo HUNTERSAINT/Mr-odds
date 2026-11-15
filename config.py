@@ -20,6 +20,12 @@ MODELS = [GEMINI_MODEL] + [m.strip() for m in _fallbacks.split(",") if m.strip()
 CACHE_SECONDS = int(os.getenv("CACHE_MINUTES", "30")) * 60
 TIMEZONE = "Africa/Lagos"
 
+# The Odds API (free plan: 500 credits/month). When set, it is the main data source.
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
+ODDS_REGIONS = os.getenv("ODDS_REGIONS", "eu")
+MIN_BOOKMAKERS = int(os.getenv("MIN_BOOKMAKERS", "5"))
+ODDS_CACHE_SECONDS = int(float(os.getenv("ODDS_CACHE_HOURS", "12")) * 3600)
+
 # On Railway, mount a volume at /data and set DB_PATH=/data/bot.db so history survives deploys.
 DB_PATH = os.getenv("DB_PATH", "bot.db")
 SETTLE_EVERY_HOURS = float(os.getenv("SETTLE_EVERY_HOURS", "3"))

@@ -7,6 +7,9 @@ Pick days + target odds → Gemini searches Google for fixtures and odds, predic
 - `/stats` – bot-wide and personal hit rate
 - `/history` – your last 5 slips with results
 
+## Data source
+With `ODDS_API_KEY` set, fixtures/odds come from The Odds API (cached in SQLite, 7 leagues, only matches priced by 5+ bookmakers) and Gemini just analyses them. Without it, the bot falls back to Gemini + Google Search (needs search-grounding quota on the Gemini key).
+
 ## How it works
 1. Gemini + Google Search writes research notes (fixtures, odds, form, injuries).
 2. A structured Gemini call turns them into JSON picks; code rejects wrong dates and impossible odds.

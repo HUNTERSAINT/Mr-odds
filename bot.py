@@ -14,7 +14,8 @@ from telegram.ext import (
 import config
 import db
 import results
-from research import LOCAL, client, get_picks
+from research import LOCAL, client
+from source import get_picks
 from slip import build_slip
 
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 DISCLAIMER = (
-    "\n\nOdds come from web search and can be out of date: confirm them on your "
+    "\n\nOdds are the median across bookmakers and can change: confirm them on your "
     "bookmaker before betting. Analysis only, not guaranteed. Bet responsibly, 18+ only."
 )
 PICK_LABEL = {"home": "Home win", "draw": "Draw", "away": "Away win"}
@@ -107,7 +108,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def _run(message, user_id: int, ctx, target: float):
     days = sorted(ctx.user_data.get("days", []))
     ctx.user_data["awaiting_odds"] = False
-    await message.reply_text("Searching games and analysing, this can take up to a minute...")
+    await message.reply_text("Analysing the games, one moment...")
     try:
         matches, preds = await get_picks(days)
         if not matches:

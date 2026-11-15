@@ -1,6 +1,7 @@
 """SQLite storage for slips and picks, so the bot can track real results."""
 import os
 import sqlite3
+import time
 from datetime import datetime, timezone
 
 import config
@@ -138,3 +139,19 @@ def recent_slips(user_id: int, n: int = 5):
         "SELECT * FROM slips WHERE user_id=? ORDER BY id DESC LIMIT ?", (user_id, n)
     ).fetchall()
     return [(s, legs_of(s["id"])) for s in rows]
+
+
+_db.execute("CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, ts REAL, value TEXT)")
+_db.commit()
+
+
+def cache_get(key: str, max_age: float):
+    r = _db.execute("SELECT ts, value FROM cache WHERE key=?", (key,)).fetchone()
+    if r and time.time() - r["ts"] < max_age:
+        return r["value"]
+    return None
+
+
+def cache_set(key: str, value: str):
+    _db.execute("INSERT OR REPLACE INTO cache(key, ts, value) VALUES(?,?,?)", (key, time.time(), value))
+    _db.commit()
