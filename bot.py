@@ -14,7 +14,7 @@ from telegram.ext import (
 import config
 import db
 import results
-from research import LOCAL, get_picks
+from research import LOCAL, client, get_picks
 from slip import build_slip
 
 logging.basicConfig(level=logging.INFO)
@@ -116,9 +116,14 @@ async def _run(message, user_id: int, ctx, target: float):
             )
             return
         result = build_slip(matches, preds, target)
-    except Exception:
+    except Exception as e:
         logging.exception("run failed")
-        await message.reply_text("Something went wrong. Try again in a minute.")
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            await message.reply_text(
+                "Gemini quota reached for now. Try again in a few minutes."
+            )
+        else:
+            await message.reply_text("Something went wrong. Try again in a minute.")
         return
 
     if not result:
@@ -202,8 +207,20 @@ async def settle_job(ctx: ContextTypes.DEFAULT_TYPE):
         logging.exception("settle job failed")
 
 
+async def on_startup(app):
+    try:
+        names = []
+        async for m in await client.aio.models.list():
+            if "generateContent" in (m.supported_actions or []):
+                names.append(m.name.replace("models/", ""))
+        logging.info("Gemini models available to this key: %s", ", ".join(names))
+        logging.info("Model order used: %s", ", ".join(config.MODELS))
+    except Exception:
+        logging.exception("could not list Gemini models")
+
+
 def main():
-    app = Application.builder().token(config.TELEGRAM_TOKEN).build()
+    app = Application.builder().token(config.TELEGRAM_TOKEN).post_init(on_startup).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("history", history))

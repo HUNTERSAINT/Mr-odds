@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 import config
 import db
-from research import client
+from research import generate
 
 # A match is checked once kickoff was this long ago (90 min + half-time + stoppage + buffer).
 FINISHED_AFTER = timedelta(hours=3)
@@ -27,8 +27,7 @@ async def _find_scores(rows):
         f"{i}. {r['home']} vs {r['away']} (kickoff {r['kickoff_utc']} UTC)"
         for i, r in enumerate(rows)
     )
-    notes = await client.aio.models.generate_content(
-        model=config.GEMINI_MODEL,
+    notes = await generate(
         contents=(
             "Use Google Search to find the FINAL full-time score (90 minutes plus stoppage "
             "time; ignore extra time and penalty shootouts) for each football match below. "
@@ -41,8 +40,7 @@ async def _find_scores(rows):
     )
     if not notes.text:
         return []
-    structured = await client.aio.models.generate_content(
-        model=config.GEMINI_MODEL,
+    structured = await generate(
         contents=f"Matches:\n{listing}\n\nResearch notes:\n{notes.text}",
         config=types.GenerateContentConfig(
             system_instruction=(

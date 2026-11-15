@@ -6,13 +6,14 @@ structured JSON output in the same call:
 2. Structured call: turn the notes into validated JSON picks.
 
 Because web-sourced odds can be wrong, every item is sanity-checked in code."""
+import logging
 import time
 from datetime import date, datetime
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel
 
 import config
@@ -20,6 +21,21 @@ import config
 LOCAL = ZoneInfo(config.TIMEZONE)
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 _cache: dict = {}
+
+
+async def generate(**kwargs):
+    """generate_content with automatic fallback across config.MODELS."""
+    last = None
+    for model in config.MODELS:
+        try:
+            return await client.aio.models.generate_content(model=model, **kwargs)
+        except errors.ClientError as e:
+            if e.code in (404, 429):
+                logging.warning("model %s unavailable (%s), trying next", model, e.code)
+                last = e
+                continue
+            raise
+    raise last
 
 LEAGUES = (
     "Premier League, La Liga, Serie A, Bundesliga, Ligue 1, "
@@ -92,8 +108,7 @@ async def get_picks(days: list[date]):
     if hit and time.time() - hit[0] < config.CACHE_SECONDS:
         return hit[1]
 
-    notes = await client.aio.models.generate_content(
-        model=config.GEMINI_MODEL,
+    notes = await generate(
         contents=_research_prompt(days),
         config=types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
@@ -103,8 +118,7 @@ async def get_picks(days: list[date]):
     if not notes.text:
         return [], {}
 
-    structured = await client.aio.models.generate_content(
-        model=config.GEMINI_MODEL,
+    structured = await generate(
         contents=f"Research notes:\n{notes.text}",
         config=types.GenerateContentConfig(
             system_instruction=STRUCTURE_SYSTEM,
