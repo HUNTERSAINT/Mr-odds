@@ -65,7 +65,10 @@ async def _avail(ctx) -> dict:
     """Days that have games (cached, so this rarely costs Odds API credits)."""
     if "avail" not in ctx.user_data:
         try:
-            ctx.user_data["avail"] = await available_days()
+            days = await available_days()
+            # Only days with at least one strong favourite; if none, show all days with games.
+            strong = {d: c for d, c in days.items() if c["strong"] >= 1}
+            ctx.user_data["avail"] = strong or days
         except Exception:
             logging.exception("could not load days with games")
             ctx.user_data["avail"] = {}
@@ -78,8 +81,8 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     avail = await _avail(ctx)
     if avail:
         text = (
-            "Days with games (coming days). 'Strong' = the market gives the favourite "
-            "60%+ to win, 🔥 = 3 or more strong games.\n\n"
+            "Days with strong favourites (coming days). 'Strong' = the market gives the "
+            f"favourite {config.HIGH_PROB:.0%}+ to win, 🔥 = 3 or more strong games.\n\n"
             "Tap the days you want, then press Done."
         )
     else:
