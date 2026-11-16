@@ -22,7 +22,7 @@ class PickOut(BaseModel):
 
 class MatchOut(BaseModel):
     id: str
-    picks: list[PickOut]  # best first, at most 3, each a different market
+    picks: list[PickOut]  # best first, at most 4, each a different market
     reasoning: str  # under ~20 words
 
 
@@ -32,7 +32,7 @@ SYSTEM = (
     "each option. Home/draw/away are real bookmaker prices. Double chance, draw no bet, "
     "over/under goals and both-teams-to-score (GG) are estimated from those odds with a "
     "goals model.\n"
-    "For each match choose up to 3 DIFFERENT options (ranked best first), using only the "
+    "For each match choose up to 4 DIFFERENT options (ranked best first), using only the "
     "option keys offered for that match, spread across safer and riskier ones so they can "
     "fit different target odds. For every option give a confidence from 0 to 100: your "
     "chance that it wins. Start from the probability given and change it only for real "
@@ -89,7 +89,7 @@ async def predict(matches: list[dict]) -> dict[str, list[dict]]:
         if not m:
             continue
         seen, cands = set(), []
-        for pk in mo.picks[:3]:
+        for pk in mo.picks[:4]:
             sel = m["selections"].get(pk.market)
             if sel and pk.market not in seen:
                 seen.add(pk.market)
@@ -100,7 +100,7 @@ async def predict(matches: list[dict]) -> dict[str, list[dict]]:
 
 
 def market_only(matches: list[dict]) -> dict[str, list[dict]]:
-    """No-AI fallback: per match, a safe, a middle and a higher-paying option by probability."""
+    """No-AI fallback: per match, up to 4 options from safest to highest paying (by probability)."""
     note = "Based on bookmaker odds (AI analysis unavailable)"
     out: dict[str, list[dict]] = {}
     for m in matches:
@@ -110,7 +110,8 @@ def market_only(matches: list[dict]) -> dict[str, list[dict]]:
         ) or sorted(sels.items(), key=lambda kv: kv[1]["odds"])
         if not likely:
             continue
-        idx = {0, len(likely) // 2, len(likely) - 1}
+        n = len(likely)
+        idx = {round(i * (n - 1) / 3) for i in range(4)}  # up to 4, spread over the odds range
         out[m["id"]] = [
             _cand(k, s, round(s["prob"] * 100), note) for k, s in (likely[i] for i in sorted(idx))
         ]

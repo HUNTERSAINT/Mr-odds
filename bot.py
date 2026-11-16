@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -18,7 +19,7 @@ import markets
 import results
 from research import LOCAL, client
 from source import available_days, get_picks
-from slip import build_slip
+from slip import build_slip, max_reachable
 
 logging.basicConfig(level=logging.INFO)
 # httpx logs full request URLs, which contain the Telegram bot token
@@ -61,9 +62,9 @@ def _days_keyboard(selected: set, avail: dict | None = None):
 
 
 def _odds_keyboard():
-    vals = [2, 3, 5, 10, 20]
+    rows = [[2, 3, 5, 10, 20], [50, 100, 200, 500]]
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(f"{v}x", callback_data=f"odds:{v}") for v in vals]]
+        [[InlineKeyboardButton(f"{v}x", callback_data=f"odds:{v}") for v in row] for row in rows]
     )
 
 
@@ -137,11 +138,26 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     try:
         target = float(update.message.text.replace(",", "."))
-        assert 1.2 <= target <= 100
+        assert 1.2 <= target <= config.MAX_TARGET
     except Exception:
-        await update.message.reply_text("Send a number between 1.2 and 100, e.g. 5 or 4.5")
+        await update.message.reply_text(f"Send a number between 1.2 and {config.MAX_TARGET:g}, e.g. 5, 4.5 or 150")
         return
     await _run(update.message, update.effective_user.id, ctx, target)
+
+
+async def _send_long(message, text: str, limit: int = 3900):
+    """Telegram messages max out near 4096 characters; big slips are sent in several parts."""
+    chunks, cur = [], ""
+    for block in text.split("\n\n"):
+        if cur and len(cur) + len(block) + 2 > limit:
+            chunks.append(cur)
+            cur = block
+        else:
+            cur = f"{cur}\n\n{block}" if cur else block
+    if cur:
+        chunks.append(cur)
+    for c in chunks:
+        await message.reply_text(c)
 
 
 async def _run(message, user_id: int, ctx, target: float):
@@ -178,15 +194,23 @@ async def _run(message, user_id: int, ctx, target: float):
         return
 
     if not result:
-        await message.reply_text(
-            f"Couldn't build a slip near {target}x from those games. "
-            "Try different days or a different target." + DISCLAIMER
+        reach = max_reachable(matches, cands)
+        hint = (
+            f"The most I can reach with the games on those days is about {reach:,.0f}x. "
+            "Pick more days or a lower target."
+            if reach and reach < target
+            else "Try different days or a slightly different target."
         )
+        await message.reply_text(f"Couldn't build a slip near {target:g}x. {hint}")
         return
 
     legs, total = result
     slip_id = db.save_slip(user_id, message.chat_id, target, total, legs)
-    out = [f"Slip #{slip_id}: target {target}x → {total:.2f}x ({len(legs)} picks)\n"]
+    chance = math.prod(l["cand"]["confidence"] / 100 for l in legs)
+    out = [
+        f"Slip #{slip_id}: target {target:g}x → {total:.2f}x ({len(legs)} picks)\n"
+        f"Chance that every pick wins (model estimate): {chance * 100:.1f}%\n"
+    ]
     for l in legs:
         m, c = l["match"], l["cand"]
         tag = "" if c["real"] else " (est.)"
@@ -197,7 +221,7 @@ async def _run(message, user_id: int, ctx, target: float):
             f"{c['reasoning']}\n"
         )
     note = EST_NOTE if any(not l["cand"]["real"] for l in legs) else ""
-    await message.reply_text("\n".join(out) + note + DISCLAIMER)
+    await _send_long(message, "\n".join(out) + note + DISCLAIMER)
 
 
 def _rate(won: int, lost: int) -> str:

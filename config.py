@@ -30,6 +30,8 @@ HIGH_PROB = float(os.getenv("HIGH_PROB", "0.55"))
 MARKET_MARGIN = float(os.getenv("MARKET_MARGIN", "0.06"))  # bookmaker margin assumed on estimates
 CAND_MIN_PROB = float(os.getenv("CAND_MIN_PROB", "0.45"))  # ignore selections less likely than this
 LEG_MIN_ODDS = float(os.getenv("LEG_MIN_ODDS", "1.10"))  # ignore legs paying less than this
+MAX_LEGS = int(os.getenv("MAX_LEGS", "20"))  # most games allowed in one slip
+MAX_TARGET = float(os.getenv("MAX_TARGET", "1000"))  # highest target odds a user can ask for
 # How many days ahead the day menu looks (odds usually exist ~1-2 weeks out).
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "14"))
 # Cached odds are reused this long (menu and general use)...

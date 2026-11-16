@@ -16,6 +16,7 @@ Slips can mix: home/draw/away, double chance (1X, X2, 12), draw no bet, over/und
 - Home/draw/away use real bookmaker prices (median across bookmakers).
 - The other markets are **estimated** from those prices (Poisson goals model, see `markets.py`) with an assumed 6% margin, and are marked `(est.)` in the slip. Real prices differ a little, so check them before betting.
 - Real prices for the extra markets cost extra Odds API credits per match, which the free plan (500/month) cannot afford at scale.
+- Target odds up to 1000x work: the slip builder uses dynamic programming over log-odds, so it can combine up to 20 games in well under a second.
 - If Gemini is unavailable, picks are ranked by probability from the odds instead.
 
 ## How it works
