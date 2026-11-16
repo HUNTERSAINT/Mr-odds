@@ -38,7 +38,7 @@ async def _scores_oddsapi(rows) -> dict:
                 params={"apiKey": config.ODDS_API_KEY, "daysFrom": 3, "dateFormat": "iso"},
             )
             r.raise_for_status()
-            logging.info("Odds API credits remaining: %s", r.headers.get("x-requests-remaining"))
+            odds.note_credits(r.headers)
             for ev in r.json():
                 if not ev.get("completed") or not ev.get("scores"):
                     continue

@@ -4,6 +4,7 @@ from typing import Literal
 from google.genai import types
 from pydantic import BaseModel
 
+from odds import favourite_prob
 from research import generate
 
 
@@ -44,7 +45,8 @@ def _prompt(matches: list[dict]) -> str:
 
 
 async def predict(matches: list[dict]) -> dict[str, Prediction]:
-    matches = matches[:40]
+    # Gemini sees at most 40 matches: keep the ones with the clearest favourites.
+    matches = sorted(matches, key=lambda m: -favourite_prob(m['odds']))[:40]
     resp = await generate(
         contents=_prompt(matches),
         config=types.GenerateContentConfig(

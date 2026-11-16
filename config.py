@@ -28,8 +28,15 @@ MIN_BOOKMAKERS = int(os.getenv("MIN_BOOKMAKERS", "5"))
 HIGH_PROB = float(os.getenv("HIGH_PROB", "0.55"))
 # How many days ahead the day menu looks (odds usually exist ~1-2 weeks out).
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "14"))
-ODDS_CACHE_SECONDS = int(float(os.getenv("ODDS_CACHE_HOURS", "12")) * 3600)
+# Cached odds are reused this long (menu and general use)...
+ODDS_CACHE_SECONDS = int(float(os.getenv("ODDS_CACHE_HOURS", "24")) * 3600)
+# ...but when someone builds a slip, leagues with games on the chosen days are refreshed if older than this.
+SLIP_FRESH_SECONDS = int(float(os.getenv("SLIP_FRESH_HOURS", "12")) * 3600)
+# At most this many in-season leagues are fetched (each fetch costs 1 credit).
+MAX_LEAGUES = int(os.getenv("MAX_LEAGUES", "14"))
+# Below this many credits left, stop fetching and serve saved data (keeps credits for results).
+CREDIT_RESERVE = int(os.getenv("CREDIT_RESERVE", "40"))
 
 # On Railway, mount a volume at /data and set DB_PATH=/data/bot.db so history survives deploys.
 DB_PATH = os.getenv("DB_PATH", "bot.db")
-SETTLE_EVERY_HOURS = float(os.getenv("SETTLE_EVERY_HOURS", "3"))
+SETTLE_EVERY_HOURS = float(os.getenv("SETTLE_EVERY_HOURS", "8"))

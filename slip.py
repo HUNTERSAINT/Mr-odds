@@ -5,7 +5,7 @@ from itertools import combinations
 MIN_LEG_ODDS = 1.15
 TOLERANCE = 0.20  # accept combined odds within +/-20% of target
 MAX_LEGS = 6
-POOL = 14  # top-N most confident legs considered
+POOL = 20  # top-N most confident legs considered
 
 
 def build_slip(matches: list[dict], preds: dict, target: float):
