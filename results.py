@@ -105,8 +105,7 @@ async def settle_pending() -> int:
             if not goals:
                 continue
             hg, ag = goals
-            outcome = "home" if hg > ag else "away" if hg < ag else "draw"
-            db.settle_match(r["home"], r["away"], r["kickoff_utc"], outcome, f"{hg}-{ag}")
+            db.settle_match(r["home"], r["away"], r["kickoff_utc"], hg, ag)
             settled += 1
     db.void_stale((now - GIVE_UP_AFTER).isoformat(timespec="seconds"))
     logging.info("settlement run: %s matches settled, %s checked", settled, len(rows))

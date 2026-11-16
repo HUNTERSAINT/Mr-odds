@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -13,6 +14,7 @@ from telegram.ext import (
 
 import config
 import db
+import markets
 import results
 from research import LOCAL, client
 from source import available_days, get_picks
@@ -26,7 +28,11 @@ DISCLAIMER = (
     "\n\nOdds are the median across bookmakers and can change: confirm them on your "
     "bookmaker before betting. Analysis only, not guaranteed. Bet responsibly, 18+ only."
 )
-PICK_LABEL = {"home": "Home win", "draw": "Draw", "away": "Away win"}
+EST_NOTE = (
+    "\n(est.) = estimated from the match odds. Home/draw/away are real bookmaker prices; "
+    "over/under, GG, double chance and draw no bet are estimates. "
+    "Real prices differ a little, so check them before betting."
+)
 STATUS_ICON = {"won": "✅", "lost": "❌", "pending": "⏳", "void": "➖"}
 
 
@@ -143,7 +149,7 @@ async def _run(message, user_id: int, ctx, target: float):
     ctx.user_data["awaiting_odds"] = False
     await message.reply_text("Analysing the games, one moment...")
     try:
-        matches, preds = await get_picks(days)
+        matches, cands = await get_picks(days)
         if not matches:
             avail = await available_days()
             if avail:
@@ -160,7 +166,7 @@ async def _run(message, user_id: int, ctx, target: float):
                     "break). Try again later with /start."
                 )
             return
-        result = build_slip(matches, preds, target)
+        result = await asyncio.to_thread(build_slip, matches, cands, target)
     except Exception as e:
         logging.exception("run failed")
         if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
@@ -182,14 +188,16 @@ async def _run(message, user_id: int, ctx, target: float):
     slip_id = db.save_slip(user_id, message.chat_id, target, total, legs)
     out = [f"Slip #{slip_id}: target {target}x → {total:.2f}x ({len(legs)} picks)\n"]
     for l in legs:
-        m, p = l["match"], l["pred"]
+        m, c = l["match"], l["cand"]
+        tag = "" if c["real"] else " (est.)"
         out.append(
             f"{m['kickoff']:%a %d %b %H:%M} | {m['league']}\n"
             f"{m['home']} vs {m['away']}\n"
-            f"Pick: {PICK_LABEL[p.pick]} @ {l['odds']} (confidence {p.confidence}%)\n"
-            f"{p.reasoning}\n"
+            f"Pick: {c['label']} @ {l['odds']}{tag} (confidence {c['confidence']}%)\n"
+            f"{c['reasoning']}\n"
         )
-    await message.reply_text("\n".join(out) + DISCLAIMER)
+    note = EST_NOTE if any(not l["cand"]["real"] for l in legs) else ""
+    await message.reply_text("\n".join(out) + note + DISCLAIMER)
 
 
 def _rate(won: int, lost: int) -> str:
@@ -222,7 +230,7 @@ def _format_slip(slip, legs, status: str) -> str:
         score = f" {l['score']}" if l["score"] else ""
         lines.append(
             f"{STATUS_ICON[l['status']]} {l['home']} vs {l['away']}{score} "
-            f"({PICK_LABEL[l['pick']]} @ {l['odds']})"
+            f"({markets.label(l['pick'])} @ {l['odds']}{'' if markets.is_real(l['pick']) else ' est.'})"
         )
     return "\n".join(lines)
 

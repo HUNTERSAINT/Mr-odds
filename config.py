@@ -26,6 +26,10 @@ ODDS_REGIONS = os.getenv("ODDS_REGIONS", "eu")
 MIN_BOOKMAKERS = int(os.getenv("MIN_BOOKMAKERS", "5"))
 # A "strong" match = the market gives the favourite at least this win probability.
 HIGH_PROB = float(os.getenv("HIGH_PROB", "0.55"))
+# Markets beyond 1X2 are estimated from the 1X2 odds (see markets.py).
+MARKET_MARGIN = float(os.getenv("MARKET_MARGIN", "0.06"))  # bookmaker margin assumed on estimates
+CAND_MIN_PROB = float(os.getenv("CAND_MIN_PROB", "0.45"))  # ignore selections less likely than this
+LEG_MIN_ODDS = float(os.getenv("LEG_MIN_ODDS", "1.10"))  # ignore legs paying less than this
 # How many days ahead the day menu looks (odds usually exist ~1-2 weeks out).
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "14"))
 # Cached odds are reused this long (menu and general use)...

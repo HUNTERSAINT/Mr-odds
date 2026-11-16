@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 
 import config
+import markets
 
 os.makedirs(os.path.dirname(os.path.abspath(config.DB_PATH)), exist_ok=True)
 _db = sqlite3.connect(config.DB_PATH, check_same_thread=False)
@@ -46,12 +47,12 @@ def save_slip(user_id: int, chat_id: int, target: float, total: float, legs) -> 
     )
     slip_id = cur.lastrowid
     for l in legs:
-        m, p = l["match"], l["pred"]
+        m, p = l["match"], l["cand"]
         _db.execute(
             "INSERT INTO picks(slip_id, league, home, away, kickoff_utc, pick, odds, confidence) "
             "VALUES(?,?,?,?,?,?,?,?)",
             (slip_id, m["league"], m["home"], m["away"], _utc_iso(m["kickoff"]),
-             p.pick, l["odds"], p.confidence),
+             p["market"], l["odds"], p["confidence"]),
         )
     _db.commit()
     return slip_id
@@ -66,12 +67,17 @@ def matches_to_settle(older_than_iso: str, limit: int = 20):
     ).fetchall()
 
 
-def settle_match(home: str, away: str, kickoff_utc: str, outcome: str, score: str):
-    _db.execute(
-        "UPDATE picks SET status = CASE WHEN pick=? THEN 'won' ELSE 'lost' END, score=? "
-        "WHERE status='pending' AND home=? AND away=? AND kickoff_utc=?",
-        (outcome, score, home, away, kickoff_utc),
-    )
+def settle_match(home: str, away: str, kickoff_utc: str, hg: int, ag: int):
+    """Settle every pending pick on this match from the full-time score."""
+    rows = _db.execute(
+        "SELECT id, pick FROM picks WHERE status='pending' AND home=? AND away=? AND kickoff_utc=?",
+        (home, away, kickoff_utc),
+    ).fetchall()
+    for r in rows:
+        _db.execute(
+            "UPDATE picks SET status=?, score=? WHERE id=?",
+            (markets.evaluate(r["pick"], hg, ag), f"{hg}-{ag}", r["id"]),
+        )
     _db.commit()
 
 
