@@ -29,7 +29,8 @@ from research import LOCAL
 from slip import build_slip, max_reachable
 
 CHUNK = 40  # matches per Gemini call
-MAX_MATCHES = 160  # most matches considered (clearest favourites first)
+MAX_MATCHES = 120  # most matches considered (clearest favourites first)
+GEMINI_WAIT = 75  # seconds before falling back to odds-based picks
 _cache: dict = {}
 _H: dict = {}  # helpers passed in from bot.py
 
@@ -165,17 +166,20 @@ async def _picks(days: list):
     matches = sorted(matches, key=lambda m: -odds.favourite_prob(m["odds"]))[:MAX_MATCHES]
 
     cands, ai_ok = {}, True
-    for i in range(0, len(matches), CHUNK):
-        try:
-            part = await predictor.predict(matches[i:i + CHUNK])
-        except Exception:
-            logging.exception("Gemini unavailable for /all, using odds-based picks for the rest")
+    chunks = [matches[i:i + CHUNK] for i in range(0, len(matches), CHUNK)]
+    try:  # all chunks at once, and never wait more than GEMINI_WAIT seconds in total
+        parts = await asyncio.wait_for(
+            asyncio.gather(*(predictor.predict(c) for c in chunks), return_exceptions=True),
+            GEMINI_WAIT,
+        )
+    except asyncio.TimeoutError:
+        logging.warning("Gemini too slow for /all, using odds-based picks")
+        parts = []
+    for part in parts:
+        if isinstance(part, dict) and part:
+            cands.update(part)
+        else:
             ai_ok = False
-            break
-        if not part:
-            ai_ok = False
-            break
-        cands.update(part)
     rest = [m for m in matches if m["id"] not in cands]
     if rest:
         ai_ok = False

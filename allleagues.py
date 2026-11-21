@@ -166,11 +166,13 @@ async def get_matches(days: list):
             len(cand), len(free), min(len(need), budget), len(skipped),
         )
 
-        sem = asyncio.Semaphore(5)
+        sem = asyncio.Semaphore(3)
 
         async def one(key):
             async with sem:
-                return key, await odds._fetch_league(client, key, fresh)
+                res = await odds._fetch_league(client, key, fresh)
+                await asyncio.sleep(0.4)  # stay under the Odds API rate limit (429)
+                return key, res
 
         got = list(await asyncio.gather(*(one(k) for k in fetch)))
 
