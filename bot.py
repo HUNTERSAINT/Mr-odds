@@ -308,6 +308,12 @@ def main():
     app.job_queue.run_repeating(
         settle_job, interval=config.SETTLE_EVERY_HOURS * 3600, first=120
     )
+    try:  # separate /all feature; if it fails to load, everything above still works
+        import allmode
+
+        allmode.register(app, _send_long, _format_slip, EST_NOTE, DISCLAIMER)
+    except Exception:
+        logging.exception("/all could not be loaded")
     app.run_polling()
 
 

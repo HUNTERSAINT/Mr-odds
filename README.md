@@ -4,6 +4,7 @@ Pick days + target odds → Gemini searches Google for fixtures and odds, predic
 
 ## Commands
 - `/start` – choose days and target odds
+- `/all` – all-leagues mode: every in-season league on 1-2 days (or a few days / the weekend), then target odds. Separate from `/start`
 - `/stats` – bot-wide and personal hit rate
 - `/history` – your last 5 slips with results
 
@@ -37,3 +38,6 @@ python bot.py
 
 ## Railway
 Worker service, start command `python bot.py` (set in `railway.json`). Add a volume mounted at `/data` and set `DB_PATH=/data/bot.db` so history survives redeploys.
+
+## /all (all leagues)
+Uses every in-season soccer league that has games on the chosen days (league list and fixture lookup are free; odds cost 1 credit per league, cached and shared with `/start`). Each request fetches at most `ALL_MAX_FETCH` (default 20) new leagues and never goes below `CREDIT_RESERVE`; small leagues beyond that are skipped or served from older saved data. Slips are saved like normal ones (`/history`, `/stats`).
